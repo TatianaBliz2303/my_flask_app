@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Загрузка книги и анализ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+        .loading {
+            display: none;
+            margin-top: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Загрузка книги и анализ</h1>
+        
+        <div class="form-group">
+            <label for="bookFile">Выберите текстовый файл (.txt):</label>
+            <input type="file" id="bookFile" accept=".txt">
+        </div>
+
+        <button onclick="uploadBook()">Загрузить книгу</button>
+        <div id="uploadStatus" class="loading">Загрузка и обработка книги...</div>
+
+        <div class="form-group" style="margin-top: 30px;">
+            <label for="userQuery">Ваш запрос:</label>
+            <textarea id="userQuery" rows="4" style="width: 100%; padding: 10px;"></textarea>
+            <button onclick="analyzeText()" style="margin-top: 10px;">Анализировать</button>
+        </div>
+
+        <div id="analysisResult" class="result">
+            <h3>Результаты анализа:</h3>
+            <div id="relevantContext"></div>
+            <div id="alternatives"></div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadBook() {
+            const fileInput = document.getElementById('bookFile');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!fileInput.files.length) {
+                alert('Пожалуйста, выберите файл');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            statusDiv.style.display = 'block';
+            statusDiv.textContent = 'Загрузка и обработка книги...';
+
+            try {
+                const response = await fetch('http://localhost:5000/upload_book', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    statusDiv.className = 'success';
+                    statusDiv.textContent = `Книга успешно загружена! Обработано ${data.chunks_count} фрагментов текста.`;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                statusDiv.className = 'error';
+                statusDiv.textContent = `Ошибка: ${error.message}`;
+            }
+        }
+
+        async function analyzeText() {
+            const queryInput = document.getElementById('userQuery');
+            const resultDiv = document.getElementById('analysisResult');
+            const relevantContextDiv = document.getElementById('relevantContext');
+            const alternativesDiv = document.getElementById('alternatives');
+
+            if (!queryInput.value.trim()) {
+                alert('Пожалуйста, введите ваш запрос');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:5000/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: queryInput.value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    resultDiv.style.display = 'block';
+                    relevantContextDiv.innerHTML = `<h4>Релевантный контекст из книги:</h4><p>${data.relevant_context}</p>`;
+                    alternativesDiv.innerHTML = `<h4>Альтернативные сценарии:</h4><p>${data.alternatives}</p>`;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html> 

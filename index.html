@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Альтернативная История</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 0 auto;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+        .context {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            font-style: italic;
+            display: none;
+        }
+        .server-status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            display: block;
+        }
+        .server-status.online {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .server-status.offline {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .server-status.checking {
+            background-color: #fcf8e3;
+            color: #8a6d3b;
+        }
+        .troubleshooting {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        .troubleshooting h3 {
+            margin-top: 0;
+        }
+        .troubleshooting ul {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Альтернативная История</h1>
+        <div id="serverStatus" class="server-status checking">Проверка статуса сервера...</div>
+        <div class="form-group">
+            <label for="question">Задайте вопрос о книге:</label>
+            <textarea id="question" placeholder="Например: Что произошло бы, если главный герой не встретил этого персонажа?"></textarea>
+        </div>
+        <button id="submitBtn" onclick="submitQuestion()">Отправить</button>
+        <div id="loading" class="loading">Обработка запроса...</div>
+        <div id="error" class="error"></div>
+        <div class="result" id="result" style="display: none;">
+            <h3>Результат анализа:</h3>
+            <div class="question">
+                <h4>Ваш вопрос:</h4>
+                <p id="questionText"></p>
+            </div>
+            <div class="alternative-history">
+                <h4>Альтернативный сценарий:</h4>
+                <p id="alternativeHistory"></p>
+            </div>
+        </div>
+        <div id="troubleshooting" class="troubleshooting">
+            <h3>Устранение неполадок:</h3>
+            <ul>
+                <li>Убедитесь, что сервер Flask запущен (python app.py)</li>
+                <li>Проверьте, что сервер работает на порту 5000</li>
+                <li>Убедитесь, что файл book.txt существует в той же папке, что и app.py</li>
+                <li>Попробуйте перезапустить сервер</li>
+                <li>Если проблема сохраняется, попробуйте открыть консоль разработчика (F12) и проверить ошибки</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://localhost:5000';
+        let serverCheckInterval;
+        let serverAvailable = false;
+
+        // Функция для проверки статуса сервера
+        async function checkServerStatus() {
+            const statusDiv = document.getElementById('serverStatus');
+            statusDiv.className = 'server-status checking';
+            statusDiv.textContent = 'Проверка статуса сервера...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/status`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors'
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok' && data.book_loaded) {
+                    statusDiv.textContent = 'Сервер работает, книга загружена';
+                    statusDiv.className = 'server-status online';
+                    serverAvailable = true;
+                    document.getElementById('troubleshooting').style.display = 'none';
+                    return true;
+                } else {
+                    statusDiv.textContent = 'Сервер работает, но книга не загружена';
+                    statusDiv.className = 'server-status offline';
+                    serverAvailable = false;
+                    document.getElementById('troubleshooting').style.display = 'block';
+                    return false;
+                }
+            } catch (error) {
+                console.error('Ошибка при проверке статуса сервера:', error);
+                statusDiv.textContent = 'Не удалось подключиться к серверу. Пожалуйста, проверьте подключение';
+                statusDiv.className = 'server-status offline';
+                serverAvailable = false;
+                document.getElementById('troubleshooting').style.display = 'block';
+                return false;
+            }
+        }
+
+        // Функция для отправки вопроса
+        async function submitQuestion() {
+            if (!serverAvailable) {
+                showError('Сервер недоступен. Пожалуйста, проверьте подключение и попробуйте снова.');
+                return;
+            }
+            
+            const question = document.getElementById('question').value.trim();
+            if (!question) {
+                showError('Пожалуйста, введите вопрос');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const result = document.getElementById('result');
+
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            result.style.display = 'none';
+
+            try {
+                const response = await fetch(`${SERVER_URL}/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors',
+                    body: JSON.stringify({ text: question })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Ошибка при обработке запроса: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                displayResult(data);
+            } catch (error) {
+                console.error('Ошибка при отправке запроса:', error);
+                showError(error.message);
+            } finally {
+                submitBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Функция для отображения ошибок
+        function showError(message) {
+            const error = document.getElementById('error');
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+
+        function displayResult(data) {
+            document.getElementById('questionText').textContent = data.question;
+            document.getElementById('alternativeHistory').textContent = data.alternative_history;
+            document.getElementById('result').style.display = 'block';
+        }
+
+        // Проверяем статус сервера при загрузке страницы
+        window.onload = async function() {
+            await checkServerStatus();
+            // Проверяем статус каждые 30 секунд
+            serverCheckInterval = setInterval(checkServerStatus, 30000);
+        };
+
+        // Очищаем интервал при закрытии страницы
+        window.onunload = function() {
+            if (serverCheckInterval) {
+                clearInterval(serverCheckInterval);
+            }
+        };
+    </script>
+</body>
+</html> 
